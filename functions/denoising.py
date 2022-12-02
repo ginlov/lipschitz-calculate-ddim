@@ -39,6 +39,7 @@ def ddpm_steps(x, seq, model, b, **kwargs):
         xs = [x]
         x0_preds = []
         betas = b
+        noise_list = []
         for i, j in zip(reversed(seq), reversed(seq_next)):
             t = (torch.ones(n) * i).to(x.device)
             next_t = (torch.ones(n) * j).to(x.device)
@@ -63,5 +64,6 @@ def ddpm_steps(x, seq, model, b, **kwargs):
             mask = mask.view(-1, 1, 1, 1)
             logvar = beta_t.log()
             sample = mean + mask * torch.exp(0.5 * logvar) * noise
+            noise_list.append(noise)
             xs.append(sample.to('cpu'))
-    return xs, x0_preds
+    return xs, x0_preds, noise_list[:-1]

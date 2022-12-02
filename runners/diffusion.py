@@ -247,7 +247,7 @@ class Diffusion(object):
         print(f"starting from image {img_id}")
         total_n_samples = 50000
         n_rounds = (total_n_samples - img_id) // config.sampling.batch_size
-
+        lipschitz_constant = 0.0
         with torch.no_grad():
             for _ in tqdm.tqdm(
                 range(n_rounds), desc="Generating image samples for FID evaluation."
@@ -261,14 +261,23 @@ class Diffusion(object):
                     device=self.device,
                 )
 
-                x = self.sample_image(x, model)
-                x = inverse_data_transform(config, x)
+                noises = [x]
 
+                x, noise_list = self.sample_image(x, model)
+                x = inverse_data_transform(config, x)
+                noise = noise + noise_list
                 for i in range(n):
                     tvu.save_image(
                         x[i], os.path.join(self.args.image_folder, f"{img_id}.png")
                     )
                     img_id += 1
+                noise = torch.cat(noise, dim=1)
+                noise = noise.view(n, -1)
+                x = x.view(n, -1)
+                norm_max_input = torch.pdist(noise, p=float('inf'))
+                norm_2_output = torch.pdist(noise, p=2)
+                lipschitz_constant = max(lipschitz_constant, torch.max(norm_2_output / norm_max_input).item())
+            print(lipschitz_constant)
 
     def sample_sequence(self, model):
         config = self.config
@@ -376,9 +385,10 @@ class Diffusion(object):
             x = ddpm_steps(x, seq, model, self.betas)
         else:
             raise NotImplementedError
+        noise_list = x[-1]
         if last:
-            x = x[0][-1]
-        return x
+            x = x[1][-1]
+        return x, noise_list
 
     def test(self):
         pass
