@@ -34,6 +34,7 @@ def generalized_steps(x, seq, model, b, **kwargs):
 
 def ddpm_steps(x, seq, model, b, **kwargs):
     with torch.no_grad():
+        print("seq", seq)
         n = x.size(0)
         seq_next = [-1] + list(seq[:-1])
         xs = [x]

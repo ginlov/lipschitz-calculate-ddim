@@ -245,7 +245,7 @@ class Diffusion(object):
         config = self.config
         img_id = len(glob.glob(f"{self.args.image_folder}/*"))
         print(f"starting from image {img_id}")
-        total_n_samples = 50000
+        total_n_samples = 640
         n_rounds = (total_n_samples - img_id) // config.sampling.batch_size
         lipschitz_constant = 0.0
         with torch.no_grad():
@@ -261,10 +261,9 @@ class Diffusion(object):
                     device=self.device,
                 )
 
-                noises = [x]
+                noise = [x]
 
                 x, noise_list = self.sample_image(x, model)
-                x = inverse_data_transform(config, x)
                 noise = noise + noise_list
                 for i in range(n):
                     tvu.save_image(
@@ -272,12 +271,15 @@ class Diffusion(object):
                     )
                     img_id += 1
                 noise = torch.cat(noise, dim=1)
+                print(noise.shape)
+                print(x.shape)
                 noise = noise.view(n, -1)
-                x = x.view(n, -1)
-                norm_max_input = torch.pdist(noise, p=float('inf'))
-                norm_2_output = torch.pdist(noise, p=2)
-                lipschitz_constant = max(lipschitz_constant, torch.max(norm_2_output / norm_max_input).item())
-            print(lipschitz_constant)
+                transformed_x = x.view(n, -1)
+                norm_max_input = torch.nn.functional.pdist(noise, p=float('inf'))
+                norm_2_output = torch.nn.functional.pdist(transformed_x, p=2)
+                lipschitz_constant = max(lipschitz_constant, torch.max(norm_2_output.to('cpu') / norm_max_input.to('cpu')).item())
+                x = inverse_data_transform(config, x)
+                print("lipschitz", lipschitz_constant)
 
     def sample_sequence(self, model):
         config = self.config
